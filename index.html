@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PYBLOCK - Advanced AI Coder</title>
+    
+    <!-- Blockly Core, Blocks, and Python Generator -->
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/python_compressed.js"></script>
+    
+    <!-- Pyodide (Python WebAssembly) -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    
+    <!-- Highlight.js for Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/xcode.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* Scratch 3 Color Palette */
+            --scratch-blue: #4C97FF;
+            --workspace-bg: #F9F9F9;
+            --toolbox-bg: #FFFFFF;
+            --panel-bg: #FFFFFF;
+            --border-color: #E6E8EB;
+            --text-dark: #575E75;
+            --text-light: #FFFFFF;
+            --flag-green: #59C059;
+            --border-radius: 8px;
+            --font-main: 'Nunito', sans-serif;
+            --font-code: 'Courier New', Courier, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-main); }
+
+        body { background-color: var(--workspace-bg); color: var(--text-dark); display: flex; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; }
+
+        .header { background-color: var(--scratch-blue); height: 48px; padding: 0 16px; display: flex; justify-content: space-between; align-items: center; color: var(--text-light); z-index: 20; }
+        .logo-area { display: flex; align-items: center; gap: 10px; font-size: 1.4rem; font-weight: 800; }
+        .logo-area i { color: #FFD500; font-size: 1.6rem; }
+        .toolbar-buttons { display: flex; gap: 8px; align-items: center; }
+
+        button { background-color: rgba(0, 0, 0, 0.1); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        button:hover { background-color: rgba(0, 0, 0, 0.2); }
+        .btn-download { background-color: #FF8C1A; }
+        .btn-download:hover { background-color: #E67E17; }
+
+        .controls-area { background-color: white; border-bottom: 1px solid var(--border-color); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .flag-btn { background-color: transparent; color: var(--flag-green); font-size: 24px; border: none; cursor: pointer; padding: 0; transition: transform 0.1s; }
+        .flag-btn:hover { transform: scale(1.1); }
+        .flag-btn:active { transform: scale(0.95); }
+        .flag-btn:disabled { color: #ccc; cursor: not-allowed; }
+        .stop-btn { background-color: transparent; color: #FF6680; font-size: 24px; border: none; cursor: pointer; padding: 0; margin-left: 15px; }
+
+        .workspace-container { display: flex; flex: 1; min-height: 0; background-color: var(--workspace-bg); }
+        .editor-pane { flex: 1.5; position: relative; border-right: 2px solid var(--border-color); }
+        #blocklyDiv { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+        .side-pane { flex: 1; display: flex; flex-direction: column; background-color: var(--workspace-bg); min-width: 350px; }
+
+        .panel-box { background-color: var(--panel-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); margin: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .panel-header { background-color: var(--scratch-blue); color: white; padding: 6px 12px; font-size: 0.85rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+
+        .console-panel { flex: 1.2; }
+        #consoleOutput { flex: 1; overflow-y: auto; padding: 10px; font-family: var(--font-code); font-size: 1rem; line-height: 1.5; background-color: #F0F4F8; color: #333; white-space: pre-wrap; }
+        .input-panel { height: 100px; flex-shrink: 0; }
+        #userInput { flex: 1; border: none; padding: 10px; resize: none; font-family: var(--font-code); font-size: 0.95rem; outline: none; }
+        #codePanel { flex: 0.8; }
+        pre { margin: 0; padding: 10px; flex: 1; overflow: auto; background: white !important; }
+        code { font-family: var(--font-code); font-size: 0.9rem; }
+
+        .log-out { color: #333; }
+        .log-err { color: #FF3355; font-weight: bold; }
+        .log-info { color: var(--scratch-blue); font-style: italic; font-weight: bold;}
+        .log-warn { color: #FF8C1A; font-weight: bold; }
+        .log-input { color: var(--flag-green); font-weight: bold; }
+
+        .blocklyToolboxDiv { background-color: var(--toolbox-bg) !important; border-right: 1px solid var(--border-color); padding-top: 10px; }
+        .blocklyTreeLabel { font-family: var(--font-main) !important; font-weight: 700 !important; font-size: 0.9rem !important; color: var(--text-dark) !important; }
+        .blocklyTreeRow { padding: 5px 0 !important; margin-bottom: 2px !important;}
+        .blocklyTreeRow:hover { background-color: #F2F2F2 !important; }
+        .blocklyTreeSelected .blocklyTreeRow { background-color: #E6F0FF !important; border-left: 4px solid var(--scratch-blue); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo-area"><i class="fa-brands fa-python"></i> PYBLOCK AI</div>
+        <div class="toolbar-buttons">
+            <button onclick="saveProject()"><i class="fa-solid fa-download"></i> Save to Computer</button>
+            <button onclick="document.getElementById('fileInput').click()"><i class="fa-solid fa-upload"></i> Load from Computer</button>
+            <input type="file" id="fileInput" style="display: none" accept=".json" onchange="loadProject(event)">
+            <button class="btn-download" onclick="downloadPython()"><i class="fa-brands fa-python"></i> Download .py</button>
+            <button onclick="resetWorkspace()"><i class="fa-solid fa-trash"></i> Clear</button>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <div style="font-weight: 700; display: flex; align-items: center; gap: 10px;">
+            <span>Run AI / Code:</span>
+            <button class="flag-btn" onclick="runPython()" id="runBtn" title="Go"><i class="fa-solid fa-flag"></i></button>
+            <button class="stop-btn" onclick="clearConsole()" title="Clear Terminal"><i class="fa-solid fa-circle-stop"></i></button>
+        </div>
+        <div id="pyodideStatus" style="font-size: 0.85rem; font-weight: bold; color: var(--scratch-blue);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Booting Python Engine...
+        </div>
+    </div>
+
+    <div class="workspace-container">
+        <div class="editor-pane"><div id="blocklyDiv"></div></div>
+        <div class="side-pane">
+            <div class="panel-box console-panel">
+                <div class="panel-header"><span><i class="fa-solid fa-desktop"></i> Output Terminal</span></div>
+                <div id="consoleOutput"></div>
+            </div>
+            <div class="panel-box input-panel">
+                <div class="panel-header" style="background-color: #5CB1D6;"><span><i class="fa-solid fa-keyboard"></i> Answers</span></div>
+                <textarea id="userInput" placeholder="Type answers here before clicking the Green Flag..."></textarea>
+            </div>
+            <div class="panel-box" id="codePanel">
+                <div class="panel-header" style="background-color: #FF8C1A;"><span><i class="fa-solid fa-code"></i> Python Code</span></div>
+                <pre><code id="codeDisplay" class="language-python"># Your Python code will appear here!</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRATCH TOOLBOX WITH AI EXTENSIONS -->
+    <xml id="toolbox" style="display: none">
+        <category name="Looks (Text)" colour="#9966FF">
+            <block type="text_print"><value name="TEXT"><shadow type="text"><field name="TEXT">Hello!</field></shadow></value></block>
+            <block type="text_prompt_ext"><value name="TEXT"><shadow type="text"><field name="TEXT">What's your name?</field></shadow></value></block>
+            <block type="text"></block>
+            <block type="text_join"></block>
+        </category>
+        <category name="Control" colour="#FFAB19">
+            <block type="controls_if"></block>
+            <block type="controls_repeat_ext"><value name="TIMES"><shadow type="math_number"><field name="NUM">10</field></shadow></value></block>
+            <block type="controls_whileUntil"></block>
+        </category>
+        <category name="Operators" colour="#59C059">
+            <block type="math_number"></block>
+            <block type="math_arithmetic"><value name="A"><shadow type="math_number"><field name="NUM">1</field></shadow></value><value name="B"><shadow type="math_number"><field name="NUM">1</field></shadow></value></block>
+            <block type="logic_compare"></block>
+        </category>
+        <category name="Variables" colour="#FF8C1A" custom="VARIABLE"></category>
+        <category name="Lists (Arrays)" colour="#FF6680">
+            <block type="lists_create_with"><mutation items="2"></mutation></block>
+            <block type="lists_create_with"><mutation items="3"></mutation></block>
+            <block type="lists_getIndex"><value name="VALUE"><block type="variables_get"><field name="VAR">myList</field></block></value></block>
+        </category>
+        <sep></sep>
+        <!-- NEW AI AND MODULES -->
+        <category name="🤖 AI & ML" colour="#FF3399">
+            <block type="ai_create_tree"></block>
+            <block type="ai_train"></block>
+            <block type="ai_predict">
+                <value name="INPUT">
+                    <block type="lists_create_with"><mutation items="2"></mutation></block>
+                </value>
+            </block>
+        </category>
+        <category name="📦 Modules" colour="#0FBD8C">
+            <block type="import_time"></block>
+            <block type="time_sleep"><value name="SEC"><shadow type="math_number"><field name="NUM">1</field></shadow></value></block>
+            <block type="import_math"></block>
+        </category>
+    </xml>
+
+    <script>
+        // --- 1. DEFINE CUSTOM AI & MODULE BLOCKS ---
+
+        // AI Model creation
+        Blockly.Blocks['ai_create_tree'] = {
+            init: function() {
+                this.appendDummyInput().appendField("🤖 Create AI Model (Decision Tree)");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#FF3399"); 
+            }
+        };
+        python.pythonGenerator.forBlock['ai_create_tree'] = function(block) {
+            return "from sklearn.tree import DecisionTreeClassifier\nmodel = DecisionTreeClassifier()\n";
+        };
+
+        // AI Training
+        Blockly.Blocks['ai_train'] = {
+            init: function() {
+                this.appendValueInput("X").setCheck("Array").appendField("🧠 Train AI with Features (X List)");
+                this.appendValueInput("Y").setCheck("Array").appendField("and Labels (Y List)");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#FF3399");
+            }
+        };
+        python.pythonGenerator.forBlock['ai_train'] = function(block) {
+            var x = python.pythonGenerator.valueToCode(block, 'X', python.pythonGenerator.ORDER_ATOMIC) || '[]';
+            var y = python.pythonGenerator.valueToCode(block, 'Y', python.pythonGenerator.ORDER_ATOMIC) || '[]';
+            return "model.fit(" + x + ", " + y + ")\nprint('✅ AI Model Trained Successfully!')\n";
+        };
+
+        // AI Prediction
+        Blockly.Blocks['ai_predict'] = {
+            init: function() {
+                this.appendValueInput("INPUT").setCheck("Array").appendField("🔮 AI Predict using data");
+                this.setOutput(true, null);
+                this.setColour("#FF3399");
+            }
+        };
+        python.pythonGenerator.forBlock['ai_predict'] = function(block) {
+            var input = python.pythonGenerator.valueToCode(block, 'INPUT', python.pythonGenerator.ORDER_ATOMIC) || '[]';
+            return ["model.predict([" + input + "])[0]", python.pythonGenerator.ORDER_ATOMIC];
+        };
+
+        // Standard Modules
+        Blockly.Blocks['import_time'] = {
+            init: function() {
+                this.appendDummyInput().appendField("⏱️ Import Time Module");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#0FBD8C"); 
+            }
+        };
+        python.pythonGenerator.forBlock['import_time'] = function(block) { return "import time\n"; };
+
+        Blockly.Blocks['time_sleep'] = {
+            init: function() {
+                this.appendValueInput("SEC").setCheck("Number").appendField("Wait");
+                this.appendDummyInput().appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#0FBD8C");
+            }
+        };
+        python.pythonGenerator.forBlock['time_sleep'] = function(block) {
+            var sec = python.pythonGenerator.valueToCode(block, 'SEC', python.pythonGenerator.ORDER_ATOMIC) || '1';
+            return "time.sleep(" + sec + ")\n";
+        };
+
+        Blockly.Blocks['import_math'] = {
+            init: function() {
+                this.appendDummyInput().appendField("📐 Import Math Module");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#0FBD8C"); 
+            }
+        };
+        python.pythonGenerator.forBlock['import_math'] = function(block) { return "import math\n"; };
+
+        // --- 2. WORKSPACE SETUP ---
+        let workspace;
+        let pyodideReady = false;
+        let pyodideInstance;
+        let inputQueue = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const scratchTheme = Blockly.Theme.defineTheme('scratch', {
+                base: Blockly.Themes.Classic,
+                blockStyles: {
+                    "text_blocks": { colourPrimary: "#9966FF" }, 
+                    "logic_blocks": { colourPrimary: "#59C059" }, 
+                    "math_blocks": { colourPrimary: "#59C059" },  
+                    "loop_blocks": { colourPrimary: "#FFAB19" },  
+                    "variable_blocks": { colourPrimary: "#FF8C1A" }, 
+                    "list_blocks": { colourPrimary: "#FF6680" }    
+                },
+                componentStyles: { workspaceBackgroundColour: '#F9F9F9', toolboxBackgroundColour: '#FFFFFF', cursorColour: '#4C97FF' }
+            });
+
+            workspace = Blockly.inject('blocklyDiv', {
+                toolbox: document.getElementById('toolbox'),
+                theme: scratchTheme,
+                renderer: 'zelos', 
+                grid: { spacing: 20, length: 3, colour: '#E6E8EB', snap: true },
+                zoom: { controls: true, wheel: true, startScale: 0.85 }
+            });
+
+            // PRE-BUILT AI FRUIT CLASSIFIER TEMPLATE
+            const defaultAI = `<xml>
+              <block type="ai_create_tree" x="40" y="40">
+                <next>
+                  <block type="ai_train">
+                    <value name="X">
+                      <block type="lists_create_with">
+                        <mutation items="4"></mutation>
+                        <value name="ADD0"><block type="lists_create_with"><mutation items="2"></mutation><value name="ADD0"><block type="math_number"><field name="NUM">140</field></block></value><value name="ADD1"><block type="math_number"><field name="NUM">0</field></block></value></block></value>
+                        <value name="ADD1"><block type="lists_create_with"><mutation items="2"></mutation><value name="ADD0"><block type="math_number"><field name="NUM">130</field></block></value><value name="ADD1"><block type="math_number"><field name="NUM">0</field></block></value></block></value>
+                        <value name="ADD2"><block type="lists_create_with"><mutation items="2"></mutation><value name="ADD0"><block type="math_number"><field name="NUM">150</field></block></value><value name="ADD1"><block type="math_number"><field name="NUM">1</field></block></value></block></value>
+                        <value name="ADD3"><block type="lists_create_with"><mutation items="2"></mutation><value name="ADD0"><block type="math_number"><field name="NUM">170</field></block></value><value name="ADD1"><block type="math_number"><field name="NUM">1</field></block></value></block></value>
+                      </block>
+                    </value>
+                    <value name="Y">
+                      <block type="lists_create_with">
+                        <mutation items="4"></mutation>
+                        <value name="ADD0"><block type="math_number"><field name="NUM">0</field></block></value>
+                        <value name="ADD1"><block type="math_number"><field name="NUM">0</field></block></value>
+                        <value name="ADD2"><block type="math_number"><field name="NUM">1</field></block></value>
+                        <value name="ADD3"><block type="math_number"><field name="NUM">1</field></block></value>
+                      </block>
+                    </value>
+                    <next>
+                      <block type="text_print">
+                        <value name="TEXT">
+                          <block type="text_join">
+                            <mutation items="2"></mutation>
+                            <value name="ADD0"><block type="text"><field name="TEXT">AI Predicts Fruit (0=Apple, 1=Orange): </field></block></value>
+                            <value name="ADD1">
+                              <block type="ai_predict">
+                                <value name="INPUT">
+                                  <block type="lists_create_with">
+                                    <mutation items="2"></mutation>
+                                    <value name="ADD0"><block type="math_number"><field name="NUM">145</field></block></value>
+                                    <value name="ADD1"><block type="math_number"><field name="NUM">0</field></block></value>
+                                  </block>
+                                </value>
+                              </block>
+                            </value>
+                          </block>
+                        </value>
+                      </block>
+                    </next>
+                  </block>
+                </next>
+              </block>
+            </xml>`;
+            Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(defaultAI), workspace);
+
+            workspace.addChangeListener(updateCodePreview);
+            window.addEventListener('resize', () => Blockly.svgResize(workspace), false);
+        });
+
+        function updateCodePreview(event) {
+            if (event.isUiEvent) return; 
+            const code = python.pythonGenerator.workspaceToCode(workspace);
+            const codeDisplay = document.getElementById('codeDisplay');
+            codeDisplay.textContent = code || '# Snap blocks to write code!';
+            delete codeDisplay.dataset.highlighted;
+            hljs.highlightElement(codeDisplay);
+        }
+
+        // --- 3. PYODIDE ENGINE (WITH AUTO-PACKAGE LOADER) ---
+        async function initPyodide() {
+            try {
+                pyodideInstance = await loadPyodide({
+                    stdout: (text) => writeConsole(text, 'out'),
+                    stderr: (text) => writeConsole(text, 'err')
+                });
+                pyodideReady = true;
+                document.getElementById('pyodideStatus').innerHTML = '<i class="fa-solid fa-check"></i> Python Engine Ready!';
+                document.getElementById('pyodideStatus').style.color = '#59C059';
+            } catch (err) {
+                document.getElementById('pyodideStatus').innerHTML = 'Error loading Python.';
+                document.getElementById('pyodideStatus').style.color = '#FF3355';
+            }
+        }
+        initPyodide();
+
+        window.getJsInput = function(promptText) {
+            if (promptText) writeConsole(promptText, 'out', true); 
+            let val = inputQueue.length > 0 ? inputQueue.shift() : "";
+            writeConsole(val + "\n", 'input'); 
+            return val;
+        };
+
+        async function runPython() {
+            if (!pyodideReady) return alert("Python is still booting up!");
+
+            const code = python.pythonGenerator.workspaceToCode(workspace);
+            if (!code.trim()) return;
+
+            const btn = document.getElementById('runBtn');
+            btn.style.color = "#ccc";
+            btn.disabled = true;
+
+            inputQueue = document.getElementById('userInput').value ? document.getElementById('userInput').value.split('\n') : [];
+            writeConsole(`\n🟢 Executing Code...`, "info");
+
+            // CHECK FOR AI MODULES AND WARN USER ABOUT DOWNLOAD TIMES
+            if (code.includes("sklearn") || code.includes("numpy")) {
+                writeConsole(`📦 Detected AI Libraries! Automatically downloading and installing packages from the web... (This may take up to 30 seconds on the very first run, please wait.)`, "log-warn");
+            }
+
+            const wrapperScript = `
+import builtins
+import js
+def custom_input(prompt=""): return js.getJsInput(prompt)
+builtins.input = custom_input
+            `;
+
+            try {
+                // THE MAGIC HAPPENS HERE: Auto-Load Scikit-Learn or other required Pyodide packages from Imports!
+                await pyodideInstance.loadPackagesFromImports(code); 
+                await pyodideInstance.runPythonAsync(wrapperScript);
+                await pyodideInstance.runPythonAsync(code);
+            } catch (error) {
+                writeConsole(error.message, 'err');
+            } finally {
+                btn.style.color = "var(--flag-green)";
+                btn.disabled = false;
+            }
+        }
+
+        function writeConsole(text, type, inline=false) {
+            const consoleDiv = document.getElementById('consoleOutput');
+            const span = document.createElement('span');
+            span.className = `log-${type}`;
+            span.innerText = text + (inline ? '' : '\n');
+            consoleDiv.appendChild(span);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function clearConsole() { document.getElementById('consoleOutput').innerHTML = ''; }
+        function resetWorkspace() { if(confirm("Clear everything?")) { workspace.clear(); clearConsole(); } }
+        function downloadPython() { downloadFile(python.pythonGenerator.workspaceToCode(workspace), 'pyblock_ai.py', 'text/x-python'); }
+        function saveProject() { downloadFile(JSON.stringify(Blockly.serialization.workspaces.save(workspace), null, 2), 'pyblock_ai.json', 'application/json'); }
+        function loadProject(event) {
+            const reader = new FileReader();
+            reader.onload = function(e) { workspace.clear(); Blockly.serialization.workspaces.load(JSON.parse(e.target.result), workspace); document.getElementById('fileInput').value = ''; };
+            reader.readAsText(event.target.files[0]);
+        }
+        function downloadFile(content, fileName, mimeType) {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], { type: mimeType })); a.download = fileName; a.click();
+        }
+    </script>
+</body>
+</html>
